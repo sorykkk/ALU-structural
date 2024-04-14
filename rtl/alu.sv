@@ -63,7 +63,9 @@ module alu_control_unit (
                              if    ((opcode >= ADD && 
                                      opcode <= NEG))  next = opcode;
                              else                     next = NOP;
-            ADD, SUB,
+
+            ADD,
+            SUB,
             SHR, SHL, 
             AND, OR,  NEG, 
           	MUL, DIV       :                          next = NOP;                         
@@ -130,14 +132,14 @@ module alu #(parameter WIDTH=32)(
                     @(posedge clk);
                     obus = RD2;
                     alu_fdiv = 1'b1;
-                    @(negedge clk);
+                    @(posedge clk);
             end 
             9'b000000010 : begin 
                     obus = RM1; 
                     @(posedge clk); 
                     obus = RM2; 
                     alu_fmul = 1'b1; 
-                    @(negedge clk);
+                    @(posedge clk);
             end
             default : obus = {WIDTH{1'bz}};
         endcase
@@ -208,41 +210,41 @@ module tb;
         @(negedge fin);
 
 
-        opcode = DIV;
-        @(negedge fin);
-
         opcode = MUL;
         @(negedge fin);
 
         opcode = DIV;
         @(negedge fin);
 
-        opcode = SUB;
+        opcode = MUL;
+        @(negedge fin);
+
+        opcode = ADD;
         @(negedge fin);
 
         opcode = SHR;
         @(negedge fin);
 
-        opcode = AND;
-        @(negedge fin);
+        // opcode = AND;
+        // @(negedge fin);
 
-        opcode = OR;
-        @(negedge fin);
+        // opcode = OR;
+        // @(negedge fin);
 
-        opcode = NEG;
-        @(negedge fin);
+        // opcode = NEG;
+        // @(negedge fin);
 
-        opcode = NOP;
-        @(negedge fin);
+        // opcode = NOP;
+        // @(negedge fin);
 
-        opcode = DIV;
-        @(negedge fin);
+        // opcode = DIV;
+        // @(negedge fin);
 
-        opcode = DIV;
-        @(negedge fin);
+        // opcode = DIV;
+        // @(negedge fin);
 
-        opcode = DIV;
-        @(negedge fin);
+        // opcode = DIV;
+        // @(negedge fin);
 
         $finish();
     end
@@ -292,47 +294,47 @@ module tb;
         ibus = Y;
         @(negedge fin);
 
-        #(2*CLK_PERIOD);
-        ibus = X;
-        #(2*CLK_PERIOD);
-        ibus = Y;
-        @(negedge fin);
+        // #(2*CLK_PERIOD);
+        // ibus = X;
+        // #(2*CLK_PERIOD);
+        // ibus = Y;
+        // @(negedge fin);
 
-        #(2*CLK_PERIOD);
-        ibus = X;
-        #(2*CLK_PERIOD);
-        ibus = Y;
-        @(negedge fin);
+        // #(2*CLK_PERIOD);
+        // ibus = X;
+        // #(2*CLK_PERIOD);
+        // ibus = Y;
+        // @(negedge fin);
 
-        #(2*CLK_PERIOD);
-        ibus = X;
-        #(2*CLK_PERIOD);
-        ibus = Y;
-        @(negedge fin);
+        // #(2*CLK_PERIOD);
+        // ibus = X;
+        // #(2*CLK_PERIOD);
+        // ibus = Y;
+        // @(negedge fin);
 
-        #(2*CLK_PERIOD);
-        ibus = X;
-        #(2*CLK_PERIOD);
-        ibus = Y;
-        @(negedge fin);
+        // #(2*CLK_PERIOD);
+        // ibus = X;
+        // #(2*CLK_PERIOD);
+        // ibus = Y;
+        // @(negedge fin);
 
-        #(2*CLK_PERIOD);
-        ibus = X;
-        #(2*CLK_PERIOD);
-        ibus = Y;
-        @(negedge fin);
+        // #(2*CLK_PERIOD);
+        // ibus = X;
+        // #(2*CLK_PERIOD);
+        // ibus = Y;
+        // @(negedge fin);
 
-        #(2*CLK_PERIOD);
-        ibus = X;
-        #(2*CLK_PERIOD);
-        ibus = Y;
-        @(negedge fin);
+        // #(2*CLK_PERIOD);
+        // ibus = X;
+        // #(2*CLK_PERIOD);
+        // ibus = Y;
+        // @(negedge fin);
 
-        #(2*CLK_PERIOD);
-        ibus = X;
-        #(2*CLK_PERIOD);
-        ibus = Y;
-        @(negedge fin);
+        // #(2*CLK_PERIOD);
+        // ibus = X;
+        // #(2*CLK_PERIOD);
+        // ibus = Y;
+        // @(negedge fin);
 
     end
 
