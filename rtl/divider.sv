@@ -26,8 +26,7 @@ module div_control_unit(
         SC    = 5'b01110,
         S11   = 5'b01111,
         S12   = 5'b10000,
-        S13   = 5'b10001,
-        STOP  = 5'b10010
+        S13   = 5'b10001
     } state_e;
 
     state_e state, next;
@@ -82,7 +81,6 @@ module div_control_unit(
 
             S11        :                          next = SC;
             S12        :                          next = START;
-            S13        :                          next = START;
         endcase
     end
 

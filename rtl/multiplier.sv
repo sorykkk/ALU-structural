@@ -17,8 +17,7 @@ module mult_control_unit(
             S7    = 4'b0111,
             SC    = 4'b1000,
             S8    = 4'b1001,
-            S9    = 4'b1010,
-            STOP  = 4'b1011
+            S9    = 4'b1010
     }state_e;
 
     state_e state;
