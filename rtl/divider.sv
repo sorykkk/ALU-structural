@@ -25,8 +25,7 @@ module div_control_unit(
         S10   = 5'b01101,
         SC    = 5'b01110,
         S11   = 5'b01111,
-        S12   = 5'b10000,
-        S13   = 5'b10001
+        S12   = 5'b10000
     } state_e;
 
     state_e state, next;
