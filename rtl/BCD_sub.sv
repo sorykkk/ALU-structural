@@ -15,14 +15,14 @@ endmodule
 module BCD_sub #(parameter WIDTH=32) (
   input [WIDTH-1:0] x,
   input [WIDTH-1:0] y,
-  output reg [WIDTH-1:0] diff,
+  output [WIDTH-1:0] diff,
     output borrow
 );
 
   wire [WIDTH-1:0]bar;
   wire [WIDTH-1:0]con;
 
-  Full_Subtractor subtr_0 (.A(x[0]), .B(y[0]), .Cin(1'b0), .Diff(con[0]), .Borrow(bar[0]));
+  Full_Subtractor subtr_0 (.A(x[0]), .B(y[0]), .Cin(1'b0), .Diff(diff[0]), .Borrow(bar[0]));
     // Full_Subtractor subtr_2(.A(x[1]), .B(y[1]), .Cin(bar[0]), .Diff(diff[1]), .Borrow(bar[1]));
     // Full_Subtractor subtr_3(.A(x[2]), .B(y[2]), .Cin(bar[1]), .Diff(diff[2]), .Borrow(bar[2]));
     // Full_Subtractor subtr_4(.A(x[3]), .B(y[3]), .Cin(bar[2]), .Diff(diff[3]), .Borrow(bar[3]));
@@ -34,14 +34,12 @@ module BCD_sub #(parameter WIDTH=32) (
     genvar i;
     generate
       for (i = 1; i < WIDTH; i = i + 1) begin
-        Full_Subtractor subtr ( .A(x[i]), .B(y[i]), .Cin(bar[i-1]), .Diff(con[i]), .Borrow(bar[i]) );
+        Full_Subtractor subtr ( .A(x[i]), .B(y[i]), .Cin(bar[i-1]), .Diff(diff[i]), .Borrow(bar[i]) );
         end
     endgenerate
 
     assign borrow = |bar;
-always @* begin
-  diff=con;
-end
+
 
 
 endmodule
