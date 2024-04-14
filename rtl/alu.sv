@@ -22,7 +22,7 @@ module alu_control_unit (
     input  op_e opcode,
     output reg  csum, csub, cdiv, cshr, 
                 cshl, cand, cor, cmul, cneg,
-    output reg  rd1, rd2
+    output reg  rd1, rd2, nop
 );
     op_e state, next;
 
@@ -34,44 +34,47 @@ module alu_control_unit (
     always @* begin
         next = NOP;
         case(state)
-            NOP           : if     (opcode == NOP)   next = NOP;
-                            else if(opcode == MUL) 
-                            begin 
-                                                     next = opcode; 
-                                                     cmul = 1'b1; 
+            NOP           : if     (opcode == NOP) begin 
+                                                      next = NOP; 
+                                                      nop = 1'b1; 
                             end
-                            else if(opcode == DIV)   
-                            begin                    next = opcode;  
-                                                     cdiv = 1'b1; 
+                            else if(opcode == MUL) begin 
+                                                      next = opcode; 
+                                                      cmul = 1'b1; 
+                            end
+                            else if(opcode == DIV) begin                     
+                                                      next = opcode;  
+                                                      cdiv = 1'b1; 
                             end
 
-                            else                     
-                            begin 
-                                                     next = RD1; 
-                                                     rd1 = 1'b1; // we activate read first ibus based on next state
+                            else begin 
+                                                      next = RD1; 
+                                                      rd1 = 1'b1; // we activate read first ibus based on next state
                                                                  // to accelerate with one clock read from ibus
                             end
 
-            RD1           : begin 
-                                                     next = RD2; 
-                                                     rd2 = 1'b1; // we do the same here
+            RD1            : begin 
+                                                      next = RD2; 
+                                                      rd2 = 1'b1; // we do the same here
                                                                  // so if it is not mult or div operation, then we know it is a simple
                                                                  // one so we can read the values no matter what operation we will perform
-                            end
-
-            RD2           : if    ((opcode >= ADD &&
-                                    opcode <= NEG))  next = opcode;
-                            else                     next = NOP;
-
+                            end                        
+            RD2            :                          
+                             if    ((opcode >= ADD && 
+                                     opcode <= NEG))  next = opcode;
+                             else                     next = NOP;
             ADD, SUB,
             SHR, SHL, 
-            AND, OR,  NEG :                          next = NOP;
+            AND, OR,  NEG, 
+          	MUL, DIV       :                          next = NOP;                         
+            
         endcase
+
     end
 
     always @(posedge clk, negedge rst_b) begin
-        { cor,  csum, csub, cdiv, cshr,
-          cshl, cand, cmul, cneg, rd1, rd2 } <= 11'b0;
+        { cor,  csum, csub, cdiv, cshr, nop,
+          cshl, cand, cmul, cneg, rd1, rd2 } <= 12'b0;
 
         case(next) 
             ADD : csum        <= 1'b1;
@@ -85,38 +88,79 @@ module alu_control_unit (
     end
 endmodule
 
+
 module alu #(parameter WIDTH=32)(
     input                  clk, rst_b,
     input  wire[WIDTH-1:0] ibus,
     input  op_e            opcode,
-    output wire[WIDTH-1:0] obus,
+    output reg [WIDTH-1:0] obus,
     output reg             fin
 );
-    reg csum, csub, cdiv, cshr,
+
+    reg csum, csub, cdiv, cshr, nop,
         cshl, cand, cor,  cmul, cneg, rd1, rd2;
     
-    reg fmul, fdiv;
+    reg fmul, alu_fmul, fdiv, alu_fdiv;
 
-    assign fin = (fmul | fdiv | csum | csub | cshr | cshl | cand | cor | cneg);
+    assign fin = (alu_fdiv| alu_fmul | csum | csub | cshr | cshl | cand | cor | cneg | nop);
 
-    reg [WIDTH:0] A, B, R;
+    reg  [WIDTH-1:0] A, B;
+    wire [WIDTH-1:0] RSUM, RSUB, RSHR, RSHL, RAND, 
+                     ROR,  RNEG, RM1,  RM2,  RD1, RD2;
 
     always @(posedge clk) begin
         if(rd1)      A <= ibus;
         else if(rd2) B <= ibus;
     end
 
-    assign obus = (csum | csub | cshr | cshl | cand | cor | cneg) ? R[WIDTH-1:0] : {WIDTH{1'bz}};
+    always @(clk, csum, csub, cshr, cshl, fmul, fdiv, cand, cor, cneg) begin
 
-    alu_control_unit alu_cntrl(.clk,  .rst_b, .opcode, .rd1, .rd2,
+        {alu_fmul, alu_fdiv} = 2'b00;
+        case({csum, csub, cshr, cshl, cand, cor, cneg, fmul, fdiv})
+            9'b100000000 : obus = RSUM;
+            9'b010000000 : obus = RSUB;
+            9'b001000000 : obus = RSHR;
+            9'b000100000 : obus = RSHL;
+            9'b000010000 : obus = RAND;
+            9'b000001000 : obus = ROR;
+            9'b000000100 : obus = RNEG;
+            
+            9'b000000001 : begin 
+                    obus = RD1;
+                    @(posedge clk);
+                    obus = RD2;
+                    alu_fdiv = 1'b1;
+                    @(negedge clk);
+            end 
+            9'b000000010 : begin 
+                    obus = RM1; 
+                    @(posedge clk); 
+                    obus = RM2; 
+                    alu_fmul = 1'b1; 
+                    @(negedge clk);
+            end
+            default : obus = {WIDTH{1'bz}};
+        endcase
+    end
+
+    alu_control_unit alu_cntrl(.clk,  .rst_b, .opcode, .rd1, .rd2, .nop,
                                .csum, .csub,  .cdiv, .cshr, 
                                .cshl, .cand,  .cor,  .cmul, .cneg);
 
-    mult #(WIDTH) mul_unit(.clk, .rst_b, .bgn(cmul), .ibus, .obus, .fin(fmul));
-    div  #(WIDTH) div_unit(.clk, .rst_b, .bgn(cdiv), .ibus, .obus, .fin(fdiv));
-    parallel_adder sum_unit(.a(A), .b(B), .cin(1'b0), .cout(), .load(csum), .sum(R));
+    mult #(WIDTH) mul_unit(.clk, .rst_b, .bgn(cmul), .ibusA(A), .ibusB(B), .obusA(RM1), .obusB(RM2), .fin(fmul));
+    div  #(WIDTH) div_unit(.clk, .rst_b, .bgn(cdiv), .ibusA(A), .ibusB(B), .obusA(RD1), .obusB(RD2), .fin(fdiv));
+  	// parallel_adder sum_unit(.a(A), .b(B), .cin(1'b0), .cout(), .sum(S));
+  
+    CSelA    #(WIDTH) add_unit (.a(A), .b(B), .cin(1'b0), .sum(RSUM), .cout(), .overflow());
+    BCD_sub  #(WIDTH) sub_unit (.x(A), .y(B), .borrow(), .diff(RSUB));
+    Rshift   #(WIDTH) shr_unit (.data_in(A), .shift_amount(6'd4), .data_out(RSHR));
+    Lshift   #(WIDTH) shl_unit (.data_in(A), .shift_amount(6'd4), .data_out(RSHL)); 
+    AND_gate #(WIDTH) and_unit (.A(A), .B(B), .Out(RAND));
+    OR_gate  #(WIDTH) or_unit  (.A(A), .B(B), .Out(ROR));
+    NOT_gate #(WIDTH) neg_unit (.A(A), .out(RNEG));
 
 endmodule
+
 
 module tb;
     localparam WIDTH=32;
@@ -133,7 +177,6 @@ module tb;
     
     localparam X = 32'b11111111111111111111111110011011,//-101
                Y = 32'b00000000000000000000000000111111;//+63
-    
     
             //    X = 32'b00000000000000000000000001100101,// +101
             //    Y = 32'b00000000000000000000000000111111;// +63
@@ -160,70 +203,52 @@ module tb;
         #(2*CLK_PERIOD-RST_PULSE);
 
         opcode = ADD;
-        @(posedge fin);
+        @(negedge fin);
+        opcode = SHL;
+        @(negedge fin);
+
 
         opcode = DIV;
-        @(posedge fin);
+        @(negedge fin);
 
         opcode = MUL;
-        @(posedge fin);
+        @(negedge fin);
 
         opcode = DIV;
-        @(posedge fin);
+        @(negedge fin);
 
-        opcode = MUL;
-        @(posedge fin);
+        opcode = SUB;
+        @(negedge fin);
 
-        opcode = DIV;
-        @(posedge fin);
+        opcode = SHR;
+        @(negedge fin);
 
-        opcode = ADD;
-        @(posedge fin);
+        opcode = AND;
+        @(negedge fin);
 
-        opcode = MUL;
-        @(posedge fin);
+        opcode = OR;
+        @(negedge fin);
 
-        opcode = DIV;
-        @(posedge fin);
+        opcode = NEG;
+        @(negedge fin);
 
-        opcode = MUL;
-        @(posedge fin);
-
-        opcode = ADD;
-        @(posedge fin);
+        opcode = NOP;
+        @(negedge fin);
 
         opcode = DIV;
-        @(posedge fin);
+        @(negedge fin);
 
-        opcode = ADD;
-        @(posedge fin);
+        opcode = DIV;
+        @(negedge fin);
 
-        opcode = MUL;
-        @(posedge fin);
-
-        opcode = ADD;
-        @(posedge fin);
-
-        opcode = MUL;
-        @(posedge fin);
+        opcode = DIV;
+        @(negedge fin);
 
         $finish();
     end
 
     initial begin 
         ibus = 0;
-
-        #(2*CLK_PERIOD);
-        ibus = X;
-        #(2*CLK_PERIOD);
-        ibus = Y;
-        @(negedge fin);
-
-        #(2*CLK_PERIOD);
-        ibus = X;
-        #(2*CLK_PERIOD);
-        ibus = Y;
-        @(negedge fin);
 
         #(2*CLK_PERIOD);
         ibus = X;

@@ -4,23 +4,21 @@ module mult_control_unit(
     input            cnt,
     input  wire[2:0] q_0,
     output reg       fin,
-    output reg       c0, c1, c2, c3, c4, c5, c6, c7, c8
+    output reg       c0, c2, c3, c4, c5, c6, c7
 );
     typedef enum bit[3:0] {
             START = 4'b0000,
             S0    = 4'b0001,
-            S1    = 4'b0010,
+            S2    = 4'b0010,
             S3    = 4'b0011,
             S4    = 4'b0100,
             S5    = 4'b0101,
             S6    = 4'b0110,
             S7    = 4'b0111,
-            S8    = 4'b1000,
-            S9    = 4'b1001,
-            STOP  = 4'b1010,
-            S11   = 4'b1011,
-            S2    = 4'b1100,
-            SC    = 4'b1101
+            SC    = 4'b1000,
+            S8    = 4'b1001,
+            S9    = 4'b1010,
+            STOP  = 4'b1011
     }state_e;
 
     state_e state;
@@ -42,11 +40,7 @@ module mult_control_unit(
                                                         //to make it read with one clock faster, like simple operation
                     end
 
-            S0    : begin 
-                                              next = S1; 
-                                              c1 = 1'b1; //we do same for second read of ibus
-                    end
-            S1    :                           next = SC;
+            S0    :                           next = SC;
 
             SC    :  if     (q_0 == 3'b010 || 
                              q_0 == 3'b001)   next = S2;
@@ -72,7 +66,7 @@ module mult_control_unit(
     end
 
     always @(posedge clk, negedge rst_b) begin
-        {c0, c1, c2, c3, c4, c5, c6, c7, c8, fin} <= 10'b0;
+        {c0, c2, c3, c4, c5, c6, c7, fin} <= 8'b0;
         case(next)
             S2   :  c2           <= 1'b1;
             S3   :  {c2, c3}     <= 2'b11;
@@ -80,8 +74,7 @@ module mult_control_unit(
             S5   :  {c2, c3, c4} <= 3'b111;
             S6   :  c5           <= 1'b1;
             S7   :  c6           <= 1'b1;
-            S8   :  c7           <= 1'b1;
-            S9   :  {c8, fin}    <= 2'b11;//accelerate fin semnal to activate when we load second regs to obus
+            S8   :  {c7, fin}    <= 2'b11;
         endcase
     end
 endmodule
@@ -162,8 +155,8 @@ endmodule
 module mult #(parameter WIDTH=32)(
     input                  clk, rst_b,
     input                  bgn,
-    input  reg [WIDTH-1:0] ibus,
-    output wire[WIDTH-1:0] obus,
+    input  reg [WIDTH-1:0] ibusA, ibusB,
+    output wire[WIDTH-1:0] obusA, obusB,
     output reg             fin
 );
 
@@ -178,19 +171,19 @@ module mult #(parameter WIDTH=32)(
 
     wire [WIDTH:0] sum;
     assign INV = ((c4)? {M[WIDTH-1:0], 1'b0 } : {M[WIDTH-1], M[WIDTH-1:0]}) ^ {(WIDTH+1){c3}};
-    parallel_adder #(WIDTH) adder_inst(.cin(c3), .a(INV), .b(A), .sum, .cout(), .load(1'b1));
+    parallel_adder #(WIDTH) adder_inst(.cin(c3), .a(INV), .b(A), .sum, .cout());
     
-    mult_reg_m #(WIDTH) m_reg (.clk, .rst_b, .ld_ibus(c0), .ibus, .m(M));
+    mult_reg_m #(WIDTH) m_reg (.clk, .rst_b, .ld_ibus(c0), .ibus(ibusA), .m(M));
     mult_reg_a #(WIDTH) a_reg (.clk, .rst_b, .clr(c0),     
                                .ld_sum(c2),  .sum(sum), 
                                .sh_r(c5),    .sh_i(A[WIDTH]), 
-                               .ld_obus(c7), .obus, 
+                               .ld_obus(c7), .obus(obusA), 
                                .a(A));
 
     mult_reg_q #(WIDTH) q_reg (.clk, .rst_b, 
-                               .ld_ibus(c1), .ibus,        
+                               .ld_ibus(c0), .ibus(ibusB),        
                                .sh_r(c5),    .sh_i(A[1:0]), 
-                               .ld_obus(c8), .obus,        
+                               .ld_obus(c7), .obus(obusB), //c8       
                                .q(Q));
     
     // complement #(WIDTH) cmpl_inst(.m(M), .c4(c4), .c3(c3), .m_out(M_OUT));
@@ -199,9 +192,9 @@ module mult #(parameter WIDTH=32)(
     assign is_cnt = &cnt;
 
     mult_control_unit cntrl_inst(.clk, .rst_b, 
-                                 .bgn, .c0, .c1, .c2, 
+                                 .bgn, .c0, .c2, 
                                  .c3,  .c4, .c5, .c6, 
-                                 .c7,  .c8, .fin,.q_0(Q[1:-1]), 
+                                 .c7,  .fin,.q_0(Q[1:-1]), 
                                  .cnt(is_cnt));
 endmodule
 

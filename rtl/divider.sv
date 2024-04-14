@@ -4,31 +4,30 @@ module div_control_unit(
     input            cnt1, cnt2,
     input  wire[2:0] a_0,
     input            m_n, a_n,
-    output reg       c0, c1, c2, c3, c4, c5, c6, c7, 
-                     c8, c9, c10, c11, c12, c13, fin
+    output reg       c0, c2, c3, c4, c5, c6, c7, 
+                     c8, c9, c10, c11, c12, fin
 );
     typedef enum bit[4:0] 
     {
         START = 5'b00000,
         S0    = 5'b00001,
-        S1    = 5'b00010,
-        SM    = 5'b00011,
-        S2    = 5'b00100,
-        SA    = 5'b00101,
-        S3    = 5'b00110,
-        S4    = 5'b00111,
-        S5    = 5'b01000,
-        S6    = 5'b01001,
-        S7    = 5'b01010,
-        S8    = 5'b01011,
-        SAN   = 5'b01100,
-        S9    = 5'b01101,
-        S10   = 5'b01110,
-        SC    = 5'b01111,
-        S11   = 5'b10000,
-        S12   = 5'b10001,
-        S13   = 5'b10010,
-        STOP  = 5'b10011
+        SM    = 5'b00010,
+        S2    = 5'b00011,
+        SA    = 5'b00100,
+        S3    = 5'b00101,
+        S4    = 5'b00110,
+        S5    = 5'b00111,
+        S6    = 5'b01000,
+        S7    = 5'b01001,
+        S8    = 5'b01010,
+        SAN   = 5'b01011,
+        S9    = 5'b01100,
+        S10   = 5'b01101,
+        SC    = 5'b01110,
+        S11   = 5'b01111,
+        S12   = 5'b10000,
+        S13   = 5'b10001,
+        STOP  = 5'b10010
     } state_e;
 
     state_e state, next;
@@ -49,11 +48,7 @@ module div_control_unit(
                                                              // so it will be like an simple operation will do
                          end
 
-            S0         : begin 
-                                                  next = S1; 
-                                                  c1 = 1'b1; // here we do the same
-                         end
-            S1         :                          next = SM;
+            S0         :                          next = SM; 
 
             SM         : if(!m_n)                 next = S2;
                          else                     next = SA;
@@ -86,14 +81,14 @@ module div_control_unit(
                          else                     next = S12;
 
             S11        :                          next = SC;
-            S12        :                          next = S13;
+            S12        :                          next = START;
             S13        :                          next = START;
         endcase
     end
 
     always @(posedge clk, negedge rst_b) begin
-        { c0, c1, c2, c3, c4, c5, c6, c7,
-          c8, c9, c10, c11, c12, c13, fin } <= 15'b0;
+        { c0, c2, c3, c4, c5, c6, c7,
+          c8, c9, c10, c11, c12, fin } <= 13'b0;
 
         case(next)
             S2   : c2            <= 1'b1;
@@ -106,8 +101,7 @@ module div_control_unit(
             S9   : {c9, c6}      <= 2'b11;
             S10  : {c6, c7, c10} <= 3'b111;
             S11  : c11           <= 1'b1;
-            S12  : c12           <= 1'b1;
-            S13  : {c13, fin}    <= 3'b11;//we accelearate fin sig, to be at the same pace as simple operation's
+            S12  : {c12, fin}    <= 2'b11;
         endcase
     end
 endmodule
@@ -207,8 +201,8 @@ endmodule
 module div #(parameter WIDTH = 32)(
     input                  clk, rst_b,
     input                  bgn,
-    input  reg [WIDTH-1:0] ibus,
-    output wire[WIDTH-1:0] obus,
+    input  reg [WIDTH-1:0] ibusA, ibusB,
+    output wire[WIDTH-1:0] obusA, obusB,
     output reg             fin
 );
 
@@ -218,9 +212,9 @@ module div #(parameter WIDTH = 32)(
     reg[WIDTH-1:0]         M;
     reg[$clog2(WIDTH)-1:0] cnt1, cnt2;
 
-    reg is_cnt1, is_cnt2,     fm,  fq,
-        c0, c1, c2, c3,  c4,  c5,  c6, 
-        c7, c8, c9, c10, c11, c12, c13;
+    reg is_cnt1, is_cnt2, fm, fq,
+        c0, c2, c3,  c4,  c5,  c6, 
+        c7, c8, c9, c10, c11, c12;
 
     //Blocul de countere
     assign is_cnt1 = &cnt1;
@@ -236,8 +230,8 @@ module div #(parameter WIDTH = 32)(
                            .a_0(A[WIDTH:WIDTH-2]), 
                            .m_n(M[WIDTH-1]), .a_n(A[WIDTH]), 
                            .bgn, .fin,
-                           .c0,  .c1, .c2, .c3,  .c4,  .c5,  .c6, 
-                           .c7,  .c8, .c9, .c10, .c11, .c12, .c13);
+                           .c0,  .c2, .c3,  .c4,  .c5,  .c6, 
+                           .c7,  .c8, .c9, .c10, .c11, .c12);
 
     //Blocul de sumator
     wire[WIDTH:0] sum;
@@ -246,10 +240,10 @@ module div #(parameter WIDTH = 32)(
     assign SUM_A = (c10) ? {1'b0, Q}  : {A};
     assign SUM_B = ((c10) ? {1'b0, QP} : {1'b0, M}) ^ {(WIDTH+1){c7}};
     parallel_adder #(WIDTH) adder_inst(.cin(c7), .a(SUM_A), .b(SUM_B), 
-                                       .sum(sum), .cout(), .load(1'b1));
+                                       .sum(sum), .cout());
 
     //Blocul cu registri
-    div_reg_m #(WIDTH) m_reg (.clk, .rst_b, .ld_ibus(c1), .shl(c2), .ibus, .m(M), .sgn(fm));
+    div_reg_m #(WIDTH) m_reg (.clk, .rst_b, .ld_ibus(c0), .shl(c2), .ibus(ibusB), .m(M), .sgn(fm));
     div_reg_q_prim #(WIDTH) qp_reg (.clk, .rst_b, .clr(c0), .shl(c4|c5), 
                                     .shl_i(c4), .inc(c9), .q_p(QP));
     
@@ -257,12 +251,12 @@ module div #(parameter WIDTH = 32)(
     reg shl;
     assign shli = (c2) ? M[WIDTH-1] : c3;
 
-    div_reg_q #(WIDTH) q_reg (.clk, .rst_b, .ld_ibus(c0), .ld_obus(c12), .ibus,
+    div_reg_q #(WIDTH) q_reg (.clk, .rst_b, .ld_ibus(c0), .ld_obus(c12), .ibus(ibusA),
                               .ld_sum(c6&c10), .sum(sum[WIDTH-1:0]), 
-                              .obus, .q(Q), .shl(c2|c5), .shl_i(shli), .sgn(fq), .sgnq(fq), .sgnm(fm));
+                              .obus(obusA), .q(Q), .shl(c2|c5), .shl_i(shli), .sgn(fq), .sgnq(fq), .sgnm(fm));
     div_reg_a #(WIDTH) a_reg (.clk, .rst_b, .clr(c0), 
                               .shr(c11), .shl(c2|c5), .shl_i(Q[WIDTH-1]), 
-                              .ld_sum(c6&~c10), .ld_obus(c13), .sum(sum), .obus, .a(A));
+                              .ld_sum(c6&~c10), .ld_obus(c12), .sum(sum), .obus(obusB), .a(A));//c13
 
 endmodule 
 
